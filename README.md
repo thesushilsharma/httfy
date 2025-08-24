@@ -32,6 +32,14 @@ Whether you're debugging a script, monitoring a server, or building a home autom
 
 ---
 
+## 🧰 Tech Stack
+- Next Js React Tailwind
+- Firebase
+- Zod
+- Shadcn
+
+---
+
 ## 🤝 Contributing
 
 We love contributors! Whether you're improving docs, building clients, or suggesting features:
