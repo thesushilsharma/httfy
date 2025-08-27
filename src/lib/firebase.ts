@@ -12,8 +12,10 @@ const firebaseConfig = {
 };
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+
 const messaging = async () => {
-  return (await isSupported()) ? getMessaging(app) : null;
+  const supported = await isSupported();
+  return supported ? getMessaging(app) : null;
 };
 
 export const fetchToken = async () => {
