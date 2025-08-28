@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -11,66 +10,81 @@ import { messaging } from "@/lib/firebase";
 import { toast } from "sonner";
 import useFcmToken from "@/hooks/use-fcm-token";
 
-
 export default function HttfyClient() {
   const { token: fcmToken, error: notificationError } = useFcmToken();
-  const [notifications, setNotifications] = React.useState<NotificationPayload[]>([]);
+  const [notifications, setNotifications] = React.useState<
+    NotificationPayload[]
+  >([]);
   const [subscription, setSubscription] = React.useState<string | null>(null);
 
+  const addNotification = React.useCallback((payload: any) => {
+    const { notification, data, from: topic } = payload;
+    if (notification) {
+      const newNotification: NotificationPayload = {
+        id: payload.messageId || Date.now().toString(),
+        topic: topic || "unknown", // FCM doesn't reliably provide topic. Best to include it in data payload.
+        title: notification.title || "New Notification",
+        message: notification.body || "",
+        priority: data?.priority || "3",
+        tags: data?.tags,
+        timestamp: new Date(),
+      };
 
-  React.useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker
-        .register('/firebase-messaging-sw.js')
-        .then((registration) => {
-          console.log('Service Worker registration successful, scope is:', registration.scope);
-        })
-        .catch((err) => {
-          console.log('Service Worker registration failed, error:', err);
-        });
+      setNotifications((prev) => [
+        newNotification,
+        ...prev.filter((n) => n.id !== newNotification.id),
+      ]);
+
+      // Also show a toast for foreground messages
+      toast.info(notification.title, {
+        description: notification.body,
+      });
     }
   }, []);
+
+  React.useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/firebase-messaging-sw.js")
+        .then((registration) => {
+          console.log(
+            "Service Worker registration successful, scope is:",
+            registration.scope
+          );
+        })
+        .catch((err) => {
+          console.log("Service Worker registration failed, error:", err);
+        });
+    }
+    // Listen for messages from the service worker
+    const channel = new BroadcastChannel("notifications");
+    const listener = (event: MessageEvent) => {
+      console.log("Broadcast channel message received:", event.data);
+      addNotification(event.data);
+    };
+    channel.addEventListener("message", listener);
+
+    return () => {
+      channel.removeEventListener("message", listener);
+      channel.close();
+    };
+  }, [addNotification]);
 
   React.useEffect(() => {
     const setupListener = async () => {
       const m = await messaging();
       if (m) {
         // This onMessage is for foreground messages.
-        // Background messages are handled by the service worker.
         const unsubscribe = onMessage(m, (payload) => {
-          console.log('Foreground message received. ', payload);
-          const { notification, data } = payload;
-          if (notification) {
-            const currentTopic = subscription;
-
-            // Only add notification if it's for the current subscription
-            // or if we are not subscribed to any topic.
-            // Note: FCM doesn't reliably provide topic info in the payload for foreground messages.
-            // We rely on the component's state.
-             const newNotification: NotificationPayload = {
-              id: payload.messageId || Date.now().toString(),
-              topic: currentTopic || "unknown", // We assume it's for the current topic
-              title: notification.title || "New Notification",
-              message: notification.body || "",
-              priority: data?.priority || "3",
-              tags: data?.tags,
-              timestamp: new Date(),
-            };
-
-            setNotifications(prev => [newNotification, ...prev]);
-
-            // Also show a toast
-             toast.info(notification.title, {
-              description: notification.body,
-            });
-          }
+          console.log("Foreground message received. ", payload);
+          addNotification(payload);
         });
         return unsubscribe;
       }
-    }
-    
+    };
+
     let unsubscribe: (() => void) | undefined;
-    setupListener().then(unsub => {
+    setupListener().then((unsub) => {
       if (unsub) {
         unsubscribe = unsub;
       }
@@ -79,10 +93,11 @@ export default function HttfyClient() {
     return () => {
       unsubscribe?.();
     };
+  }, [addNotification]);
 
-  }, [subscription]);
-
-  const handlePublish = async (data: Omit<NotificationPayload, "id" | "timestamp">) => {
+  const handlePublish = async (
+    data: Omit<NotificationPayload, "id" | "timestamp">
+  ) => {
     // if (!subscription) {
     //   toast.error("Not Subscribed", {
     //     description: "Please subscribe to a topic before publishing.",
@@ -95,16 +110,16 @@ export default function HttfyClient() {
       title: data.title,
       message: data.message,
       priority: data.priority,
-      tags: data.tags || ''
+      tags: data.tags || "",
     };
 
     try {
       const response = await fetch(`/api/send-notification`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -115,7 +130,8 @@ export default function HttfyClient() {
         const errorData = await response.json();
         console.error("API Send Error:", errorData);
         toast.error("Failed to Send", {
-          description: errorData.error || `Could not publish to topic: ${data.topic}.`,
+          description:
+            errorData.error || `Could not publish to topic: ${data.topic}.`,
         });
       }
     } catch (e) {
@@ -129,20 +145,21 @@ export default function HttfyClient() {
   const handleUnsubscribe = async (topic: string) => {
     if (!fcmToken) return;
     try {
-      await fetch('/api/unsubscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch("/api/unsubscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: fcmToken, topic }),
       });
     } catch (error) {
-      console.error('Failed to unsubscribe from topic:', topic, error);
+      console.error("Failed to unsubscribe from topic:", topic, error);
     }
   };
 
   const handleSubscribe = async (topic: string) => {
     if (!fcmToken) {
       toast.error("FCM Token not available", {
-        description: "Could not get FCM token. Please ensure notifications are enabled.",
+        description:
+          "Could not get FCM token. Please ensure notifications are enabled.",
       });
       return;
     }
@@ -152,9 +169,9 @@ export default function HttfyClient() {
     }
 
     try {
-      const response = await fetch('/api/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: fcmToken, topic }),
       });
 
@@ -165,9 +182,10 @@ export default function HttfyClient() {
         });
       } else {
         const error = await response.json();
-        console.error("Subscription error", error)
+        console.error("Subscription error", error);
         toast.error("Subscription failed", {
-          description: "Could not subscribe to topic. Check console for details.",
+          description:
+            "Could not subscribe to topic. Check console for details.",
         });
       }
     } catch (e) {
@@ -179,14 +197,29 @@ export default function HttfyClient() {
   };
 
   const filteredNotifications = subscription
-    ? notifications.filter((n) => n.topic === subscription)
+  ? notifications.filter((n) => {
+    // In a real-world scenario, the topic would be part of the payload.
+    // FCM's `from` field is not always the topic name, especially for device group messaging.
+    // For this app, we assume `from` is the topic or we filter by the current subscription
+    // if the topic is not available in the payload.
+        return (
+          n.topic === subscription ||
+          (n.topic === "unknown" && subscription)
+        );
+      })
     : [];
 
   return (
     <Tabs defaultValue="subscribe" className="w-full">
       <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="subscribe"><BellRing className="mr-2" />Subscribe & Receive</TabsTrigger>
-        <TabsTrigger value="publish"><Send className="mr-2" />Publish Message</TabsTrigger>
+        <TabsTrigger value="subscribe">
+          <BellRing className="mr-2" />
+          Subscribe & Receive
+        </TabsTrigger>
+        <TabsTrigger value="publish">
+          <Send className="mr-2" />
+          Publish Message
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="subscribe">
         <SubscribePanel
@@ -197,7 +230,10 @@ export default function HttfyClient() {
         />
       </TabsContent>
       <TabsContent value="publish">
-      <PublishForm onPublish={handlePublish} currentSubscription={subscription}/>
+        <PublishForm
+          onPublish={handlePublish}
+          currentSubscription={subscription}
+        />
       </TabsContent>
     </Tabs>
   );

@@ -114,7 +114,7 @@ const useFcmToken = () => {
     const setupListener = async () => {
       if (!token) return; // Exit if no token is available.
 
-      console.log(`onMessage registered with token ${token}`);
+      // console.log(`onMessage registered with token ${token}`);
       const m = await messaging();
       if (!m) {
         setError("Firebase messaging not supported in this browser");
