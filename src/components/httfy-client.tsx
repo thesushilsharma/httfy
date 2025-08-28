@@ -20,15 +20,25 @@ export default function HttfyClient() {
   const addNotification = React.useCallback((payload: any) => {
     const { notification, data, from: topic } = payload;
     if (notification) {
+      // Try to extract topic from various sources
+      let extractedTopic = topic;
+      
+      // If topic is not available from 'from' field, try to get it from data
+      if (!extractedTopic || extractedTopic === "847251267649") {
+        extractedTopic = data?.topic || subscription || "unknown";
+      }
+      
       const newNotification: NotificationPayload = {
         id: payload.messageId || Date.now().toString(),
-        topic: topic || "unknown", // FCM doesn't reliably provide topic. Best to include it in data payload.
+        topic: extractedTopic,
         title: notification.title || "New Notification",
         message: notification.body || "",
         priority: data?.priority || "3",
         tags: data?.tags,
         timestamp: new Date(),
       };
+
+      console.log("Adding notification:", newNotification);
 
       setNotifications((prev) => [
         newNotification,
@@ -40,7 +50,7 @@ export default function HttfyClient() {
         description: notification.body,
       });
     }
-  }, []);
+  }, [subscription]);
 
   React.useEffect(() => {
     if ("serviceWorker" in navigator) {
@@ -60,6 +70,7 @@ export default function HttfyClient() {
     const channel = new BroadcastChannel("notifications");
     const listener = (event: MessageEvent) => {
       console.log("Broadcast channel message received:", event.data);
+      console.log("Current subscription:", subscription);
       addNotification(event.data);
     };
     channel.addEventListener("message", listener);
@@ -68,7 +79,7 @@ export default function HttfyClient() {
       channel.removeEventListener("message", listener);
       channel.close();
     };
-  }, [addNotification]);
+  }, [addNotification, subscription]);
 
   React.useEffect(() => {
     const setupListener = async () => {
@@ -197,14 +208,16 @@ export default function HttfyClient() {
   };
 
   const filteredNotifications = subscription
-  ? notifications.filter((n) => {
-    // In a real-world scenario, the topic would be part of the payload.
-    // FCM's `from` field is not always the topic name, especially for device group messaging.
-    // For this app, we assume `from` is the topic or we filter by the current subscription
-    // if the topic is not available in the payload.
+    ? notifications.filter((n) => {
+        // Show notifications that match the current subscription
+        // or show notifications with "unknown" topic when we have an active subscription
+        // (this handles cases where FCM doesn't provide the topic in the payload)
         return (
           n.topic === subscription ||
-          (n.topic === "unknown" && subscription)
+          (n.topic === "unknown" && subscription) ||
+          // Also show notifications that might have been sent to the current subscription
+          // even if the topic field doesn't match exactly
+          (subscription && n.topic !== "unknown" && n.topic.includes(subscription))
         );
       })
     : [];

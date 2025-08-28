@@ -28,6 +28,7 @@ export async function POST(request: Request) {
       data: {
         priority: priority || "3",
         tags: tags || "",
+        topic: topic, // Include topic in data payload for better tracking
       },
       topic: topic,
     };
