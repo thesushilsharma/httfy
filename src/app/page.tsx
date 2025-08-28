@@ -2,6 +2,7 @@ import { Footer } from "@/components/footer";
 import { Header } from "@/components/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, File, Package, Zap } from "lucide-react";
+import HttfyClient from "@/components/httfy-client";
 
 export default function Home() {
   const features = [
@@ -41,7 +42,7 @@ export default function Home() {
         </section>
 
         <section className="container mx-auto max-w-5xl px-4">
-          
+          <HttfyClient />
         </section>
 
         <section className="container mx-auto px-4 py-16 md:py-24">

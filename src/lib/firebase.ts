@@ -2,13 +2,13 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getMessaging, getToken, isSupported } from "firebase/messaging";
 
 const firebaseConfig = {
-   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-    measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+  apiKey: "AIzaSyDt2TOS7pYMa-Ghn9IZCtKOIaDqXeNq-r0",
+  authDomain: "httfy-9fd3a.firebaseapp.com",
+  projectId: "httfy-9fd3a",
+  storageBucket: "httfy-9fd3a.firebasestorage.app",
+  messagingSenderId: "847251267649",
+  appId: "1:847251267649:web:bd3dd27c544f9643c7e6c0",
+  measurementId: "G-BS60P6PWPP"
 };
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
