@@ -6,10 +6,24 @@ import { fetchToken, messaging } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+// Global flag to prevent duplicate token fetching
+let isTokenFetching = false;
+let cachedToken: string | null = null;
+
 async function getNotificationPermissionAndToken() {
   // Step 1: Check if Notifications are supported in the browser.
   if (!("Notification" in window)) {
     console.error("This browser does not support desktop notification");
+    return null;
+  }
+
+  // Return cached token if available
+  if (cachedToken) {
+    return cachedToken;
+  }
+
+  // Prevent duplicate fetching
+  if (isTokenFetching) {
     return null;
   }
 
@@ -18,7 +32,14 @@ async function getNotificationPermissionAndToken() {
   // Step 2: Check if permission is already granted.
   if (Notification.permission === "granted") {
     console.log("Notification permission already granted, fetching token...");
-    return await fetchToken();
+    isTokenFetching = true;
+    try {
+      const token = await fetchToken();
+      cachedToken = token;
+      return token;
+    } finally {
+      isTokenFetching = false;
+    }
   }
 
   // Step 3: If permission is not denied, request permission from the user.
@@ -27,7 +48,14 @@ async function getNotificationPermissionAndToken() {
     const permission = await Notification.requestPermission();
     console.log("Permission result:", permission);
     if (permission === "granted") {
-      return await fetchToken();
+      isTokenFetching = true;
+      try {
+        const token = await fetchToken();
+        cachedToken = token;
+        return token;
+      } finally {
+        isTokenFetching = false;
+      }
     }
   }
 

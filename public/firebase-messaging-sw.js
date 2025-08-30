@@ -6,6 +6,21 @@ importScripts(
   "https://www.gstatic.com/firebasejs/12.2.0/firebase-messaging-compat.js"
 );
 
+// Close any existing service worker
+self.addEventListener('install', (event) => {
+  console.log('[firebase-messaging-sw.js] Service Worker installing...');
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  console.log('[firebase-messaging-sw.js] Service Worker activating...');
+  event.waitUntil(
+    self.clients.claim().then(() => {
+      console.log('[firebase-messaging-sw.js] Service Worker activated and claimed clients');
+    })
+  );
+});
+
 const firebaseConfig = {
   apiKey: "AIzaSyDt2TOS7pYMa-Ghn9IZCtKOIaDqXeNq-r0",
   authDomain: "httfy-9fd3a.firebaseapp.com",

@@ -1,17 +1,35 @@
-
 "use client";
 
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "./ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { ArrowUpCircle, File, Rss, Send, Tags } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ArrowUpCircle, File, Loader2, Rss, Send, Tags } from "lucide-react";
 
 const formSchema = z.object({
   topic: z.string().min(1, "Topic is required"),
@@ -23,14 +41,14 @@ const formSchema = z.object({
 
 type PublishFormProps = {
   onPublish: (data: Omit<NotificationPayload, "id" | "timestamp">) => void;
-  currentSubscription: string | null;
+  isPublishing: boolean;
 };
 
-export function PublishForm({ onPublish, currentSubscription }: PublishFormProps) {
+export function PublishForm({ onPublish, isPublishing }: PublishFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      topic: currentSubscription || "",
+      topic: "",
       title: "",
       message: "",
       priority: "3",
@@ -38,51 +56,56 @@ export function PublishForm({ onPublish, currentSubscription }: PublishFormProps
     },
   });
 
-  React.useEffect(() => {
-    if (currentSubscription) {
-      form.setValue("topic", currentSubscription);
-    }
-  }, [currentSubscription, form]);
-
   function onSubmit(values: z.infer<typeof formSchema>) {
     onPublish(values);
     form.reset({
       ...values,
       title: "",
       message: "",
-      tags: ""
+      tags: "",
     });
   }
-  
+
   const priorityMap = {
-    "1": { label: "Min", icon: <ArrowUpCircle className="h-4 w-4 rotate-180" /> },
-    "2": { label: "Low", icon: <ArrowUpCircle className="h-4 w-4 rotate-180" /> },
+    "1": {
+      label: "Min",
+      icon: <ArrowUpCircle className="h-4 w-4 rotate-180" />,
+    },
+    "2": {
+      label: "Low",
+      icon: <ArrowUpCircle className="h-4 w-4 rotate-180" />,
+    },
     "3": { label: "Default", icon: <ArrowUpCircle className="h-4 w-4" /> },
     "4": { label: "High", icon: <ArrowUpCircle className="h-4 w-4" /> },
     "5": { label: "Max", icon: <ArrowUpCircle className="h-4 w-4" /> },
-  }
+  };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="font-headline">Publish a Notification</CardTitle>
         <CardDescription>
-        Send a message to any topic. If the topic doesn't exist, it will be created on the fly.
+          Send a message to any topic. If the topic doesn't exist, it will be
+          created on the fly.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <FormField
+            <FormField
               control={form.control}
               name="topic"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Topic</FormLabel>
-                   <FormControl>
+                  <FormControl>
                     <div className="relative">
                       <Rss className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input placeholder="Enter a topic to publish to..." className="pl-10" {...field} />
+                      <Input
+                        placeholder="Enter a topic to publish to..."
+                        className="pl-10"
+                        {...field}
+                      />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -109,7 +132,10 @@ export function PublishForm({ onPublish, currentSubscription }: PublishFormProps
                 <FormItem>
                   <FormLabel>Message</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Describe the notification..." {...field} />
+                    <Textarea
+                      placeholder="Describe the notification..."
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -122,16 +148,23 @@ export function PublishForm({ onPublish, currentSubscription }: PublishFormProps
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Priority</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select priority" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {Object.entries(priorityMap).map(([value, {label}]) => (
-                            <SelectItem key={value} value={value}>{label}</SelectItem>
-                        ))}
+                        {Object.entries(priorityMap).map(
+                          ([value, { label }]) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          )
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -147,7 +180,11 @@ export function PublishForm({ onPublish, currentSubscription }: PublishFormProps
                     <FormControl>
                       <div className="relative">
                         <Tags className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input placeholder="e.g., tada, success, heavy_check_mark" className="pl-10" {...field} />
+                        <Input
+                          placeholder="e.g., tada, success, heavy_check_mark"
+                          className="pl-10"
+                          {...field}
+                        />
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -155,19 +192,34 @@ export function PublishForm({ onPublish, currentSubscription }: PublishFormProps
                 )}
               />
             </div>
-             <FormItem>
-                <FormLabel>Attachment</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                     <File className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input type="file" className="pl-10" disabled/>
-                  </div>
-                </FormControl>
-                <p className="text-xs text-muted-foreground">File attachments are coming soon!</p>
-              </FormItem>
+            <FormItem>
+              <FormLabel>Attachment</FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <File className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input type="file" className="pl-10" disabled />
+                </div>
+              </FormControl>
+              <p className="text-xs text-muted-foreground">
+                File attachments are coming soon!
+              </p>
+            </FormItem>
 
-            <Button type="submit" className="w-full md:w-auto">
-              <Send className="mr-2 h-4 w-4" /> Send Notification
+            <Button
+              type="submit"
+              className="w-full md:w-auto"
+              disabled={isPublishing}
+            >
+              {isPublishing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
+                  Publishing...
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-4 w-4" /> Send Notification
+                </>
+              )}
             </Button>
           </form>
         </Form>

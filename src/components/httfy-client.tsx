@@ -8,25 +8,37 @@ import { BellRing, Send } from "lucide-react";
 import { onMessage } from "firebase/messaging";
 import { messaging } from "@/lib/firebase";
 import { toast } from "sonner";
-import useFcmToken from "@/hooks/use-fcm-token";
+import { useSubscribe } from "@/hooks/use-subscribe";
+import { useUnsubscribe } from "@/hooks/use-unsubscribe";
+import { usePublish } from "@/hooks/use-publish";
 
 export default function HttfyClient() {
-  const { token: fcmToken, error: notificationError } = useFcmToken();
   const [notifications, setNotifications] = React.useState<
     NotificationPayload[]
   >([]);
-  const [subscription, setSubscription] = React.useState<string | null>(null);
+  
+  const { subscribeMutation, subscriptions, setSubscriptions } = useSubscribe();
+  const { unsubscribeMutation } = useUnsubscribe(setSubscriptions);
+  const { publishMutation } = usePublish();
 
   const addNotification = React.useCallback((payload: any) => {
-    const { notification, data, from: topic } = payload;
+    const { notification, data, from, collapseKey } = payload;
     if (notification) {
       // Try to extract topic from various sources
-      let extractedTopic = topic;
+      let extractedTopic = "unknown";
       
-      // If topic is not available from 'from' field, try to get it from data
-      if (!extractedTopic || extractedTopic === "847251267649") {
-        extractedTopic = data?.topic || subscription || "unknown";
+      // Try to get topic from data field first
+      if (data?.topic) {
+        extractedTopic = data.topic;
+      } else if (collapseKey) {
+        // collapseKey often contains the topic
+        extractedTopic = collapseKey;
+      } else if (from) {
+        // Remove '/topics/' prefix if present
+        extractedTopic = from.replace('/topics/', '');
       }
+      
+      console.log("Extracted topic:", extractedTopic);
       
       const newNotification: NotificationPayload = {
         id: payload.messageId || Date.now().toString(),
@@ -40,17 +52,18 @@ export default function HttfyClient() {
 
       console.log("Adding notification:", newNotification);
 
-      setNotifications((prev) => [
-        newNotification,
-        ...prev.filter((n) => n.id !== newNotification.id),
-      ]);
+     setNotifications((prev) =>
+        [newNotification, ...prev].filter(
+          (n, i, self) => i === self.findIndex((t) => t.id === n.id)
+        )
+      );
 
       // Also show a toast for foreground messages
       toast.info(notification.title, {
         description: notification.body,
       });
     }
-  }, [subscription]);
+  }, []);
 
   React.useEffect(() => {
     if ("serviceWorker" in navigator) {
@@ -70,7 +83,7 @@ export default function HttfyClient() {
     const channel = new BroadcastChannel("notifications");
     const listener = (event: MessageEvent) => {
       console.log("Broadcast channel message received:", event.data);
-      console.log("Current subscription:", subscription);
+      console.log("Current subscriptions:", subscriptions);
       addNotification(event.data);
     };
     channel.addEventListener("message", listener);
@@ -79,7 +92,7 @@ export default function HttfyClient() {
       channel.removeEventListener("message", listener);
       channel.close();
     };
-  }, [addNotification, subscription]);
+  }, [addNotification, subscriptions]);
 
   React.useEffect(() => {
     const setupListener = async () => {
@@ -106,121 +119,19 @@ export default function HttfyClient() {
     };
   }, [addNotification]);
 
-  const handlePublish = async (
-    data: Omit<NotificationPayload, "id" | "timestamp">
-  ) => {
-    // if (!subscription) {
-    //   toast.error("Not Subscribed", {
-    //     description: "Please subscribe to a topic before publishing.",
-    //   });
-    //   return;
-    // }
-
-    const payload = {
-      topic: data.topic,
-      title: data.title,
-      message: data.message,
-      priority: data.priority,
-      tags: data.tags || "",
-    };
-
-    try {
-      const response = await fetch(`/api/send-notification`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (response.ok) {
-        toast.success("Notification Sent!", {
-          description: `Message published to topic: ${data.topic}`,
-        });
-      } else {
-        const errorData = await response.json();
-        console.error("API Send Error:", errorData);
-        toast.error("Failed to Send", {
-          description:
-            errorData.error || `Could not publish to topic: ${data.topic}.`,
-        });
-      }
-    } catch (e) {
-      console.error("API Send Exception:", e);
-      toast.error("Failed to Send", {
-        description: `Could not publish to topic: ${data.topic}. Check console for details.`,
-      });
-    }
-  };
-
-  const handleUnsubscribe = async (topic: string) => {
-    if (!fcmToken) return;
-    try {
-      await fetch("/api/unsubscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: fcmToken, topic }),
-      });
-    } catch (error) {
-      console.error("Failed to unsubscribe from topic:", topic, error);
-    }
-  };
-
-  const handleSubscribe = async (topic: string) => {
-    if (!fcmToken) {
-      toast.error("FCM Token not available", {
-        description:
-          "Could not get FCM token. Please ensure notifications are enabled.",
-      });
-      return;
-    }
-
-    if (subscription && subscription !== topic) {
-      await handleUnsubscribe(subscription);
-    }
-
-    try {
-      const response = await fetch("/api/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: fcmToken, topic }),
-      });
-
-      if (response.ok) {
-        setSubscription(topic);
-        toast.success("Subscribed!", {
-          description: `You will now receive notifications for topic: ${topic}`,
-        });
-      } else {
-        const error = await response.json();
-        console.error("Subscription error", error);
-        toast.error("Subscription failed", {
-          description:
-            "Could not subscribe to topic. Check console for details.",
-        });
-      }
-    } catch (e) {
-      console.error(e);
-      toast.error("Subscription Error", {
-        description: "An error occurred while subscribing. Check the console.",
-      });
-    }
-  };
-
-  const filteredNotifications = subscription
-    ? notifications.filter((n) => {
-        // Show notifications that match the current subscription
-        // or show notifications with "unknown" topic when we have an active subscription
-        // (this handles cases where FCM doesn't provide the topic in the payload)
-        return (
-          n.topic === subscription ||
-          (n.topic === "unknown" && subscription) ||
-          // Also show notifications that might have been sent to the current subscription
-          // even if the topic field doesn't match exactly
-          (subscription && n.topic !== "unknown" && n.topic.includes(subscription))
-        );
-      })
-    : [];
+  const filteredNotifications = subscriptions.length > 0
+  ? notifications.filter((n) => {
+      // Show notifications that match any of the current subscriptions
+      // or show notifications with "unknown" topic when we have active subscriptions
+      return (
+        subscriptions.includes(n.topic) ||
+        (n.topic === "unknown" && subscriptions.length > 0) ||
+        // Also show notifications that might have been sent to any of our subscriptions
+        // even if the topic field doesn't match exactly
+        subscriptions.some(sub => n.topic.includes(sub))
+      );
+    })
+  : [];
 
   return (
     <Tabs defaultValue="subscribe" className="w-full">
@@ -235,17 +146,18 @@ export default function HttfyClient() {
         </TabsTrigger>
       </TabsList>
       <TabsContent value="subscribe">
-        <SubscribePanel
-          onSubscribe={handleSubscribe}
+         <SubscribePanel
+          subscriptions={subscriptions}
+          onSubscribe={(topic) => subscribeMutation.mutate(topic)}
+          onUnsubscribe={(topic) => unsubscribeMutation.mutate(topic)}
           notifications={filteredNotifications}
-          currentSubscription={subscription}
-          notificationError={notificationError}
+          isSubscribing={subscribeMutation.isPending}
         />
       </TabsContent>
       <TabsContent value="publish">
-        <PublishForm
-          onPublish={handlePublish}
-          currentSubscription={subscription}
+        <PublishForm 
+          onPublish={(data) => publishMutation.mutate(data)}
+          isPublishing={publishMutation.isPending}
         />
       </TabsContent>
     </Tabs>
